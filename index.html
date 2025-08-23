@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>画像放り込みルーレット</title>
+    <link rel="icon" href="favicon10.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+    <style>
+        /* カスタムスタイル */
+        body {
+            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+        }
+        /* ドラッグ中のスタイル */
+        .drag-over {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        /* タイルのホバー時に削除ボタンを表示 */
+        .image-tile:hover .delete-btn {
+            opacity: 1;
+        }
+        
+        /* --- ルーレット結果の豪華なエフェクト --- */
+        @keyframes glow {
+            0%, 100% {
+                box-shadow: 0 0 20px 5px rgba(255, 223, 0, 0.7);
+                border-color: gold;
+            }
+            50% {
+                box-shadow: 0 0 40px 15px rgba(255, 223, 0, 1);
+                border-color: white;
+            }
+        }
+        /* 画像の拡大のみを担当 */
+        .winner-image {
+            transform: scale(1.05);
+            transition: transform 0.3s ease-in-out;
+        }
+
+        #roulette-window {
+            transition: background 0.5s ease-in-out;
+        }
+
+        /* is-finishedクラスが付与された時のスタイル */
+        #roulette-window.is-finished {
+            overflow: visible; /* glowエフェクトが見えるようにする */
+            background: radial-gradient(circle, rgba(60,60,60,1) 0%, rgba(10,10,10,1) 80%); /* スポットライト風の背景 */
+            border: 4px solid gold; /* 枠とアニメーションをウィンドウに適用 */
+            animation: glow 2s ease-in-out infinite;
+        }
+        #roulette-window.is-finished:hover #close-modal-btn {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        /* ローディングスピナー */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loader {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 flex h-screen">
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 flex flex-col p-4 md:p-8 overflow-hidden items-center justify-center">
+        <header class="mb-4 text-center">
+            <h1 class="text-3xl font-bold text-gray-700">画像放り込みルーレット</h1>
+            <p class="text-gray-500 mt-1">画像をフィールド（点線内）にドロップして回転してください。</p>
+        </header>
+        
+        <div class="flex items-center justify-center w-full max-w-5xl gap-8">
+            <!-- 画像ドロップゾーン (正方形) -->
+            <div id="drop-zone-wrapper" class="w-full max-w-3xl aspect-square">
+                <div id="drop-zone" class="relative h-full w-full border-4 border-dashed border-gray-300 rounded-2xl p-2 flex flex-col bg-white shadow-inner transition-all duration-300">
+                    <!-- 画像タイルコンテナ -->
+                    <div id="image-list" class="w-full h-full grid gap-0 overflow-hidden">
+                        <!-- JSによってタイルが追加される -->
+                    </div>
+                    
+                    <!-- 初期表示のメッセージ -->
+                    <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-400 pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <p class="text-lg font-semibold">ここに画像をドラッグ＆ドロップ</p>
+                    </div>
+                     <!-- エラーメッセージ -->
+                    <div id="error-message" class="absolute inset-0 bg-red-500 bg-opacity-90 text-white hidden items-center justify-center text-2xl font-bold rounded-xl">
+                        画像が多すぎて表示できません！
+                    </div>
+                     <!-- ローディングオーバーレイ -->
+                    <div id="loading-overlay" class="absolute inset-0 bg-white bg-opacity-80 hidden items-center justify-center z-20 rounded-xl">
+                        <div class="loader"></div>
+                    </div>
+                    
+                    <input type="file" id="file-input" class="hidden" multiple accept="image/*">
+                </div>
+            </div>
+            <!-- ★修正点: 操作ボタンのコンテナ -->
+            <div class="flex flex-col items-center gap-4">
+                <button id="clear-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full shadow-md transform hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100">
+                    全クリア
+                </button>
+                <button id="spin-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100">
+                    回転
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- ルーレットモーダル -->
+    <div id="roulette-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50">
+        <div id="roulette-window" class="relative bg-gray-800 rounded-2xl shadow-2xl flex items-center justify-center border-4 border-gray-600">
+            <div class="w-full h-full rounded-xl overflow-hidden">
+                <img id="roulette-image" src="" class="w-full h-full object-cover" alt="Roulette Image">
+            </div>
+            <button id="close-modal-btn" class="absolute top-3 right-3 text-white bg-black bg-opacity-50 rounded-full p-2 hover:bg-opacity-75 transition-opacity opacity-0 pointer-events-none z-20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- ★追加点: クリア確認モーダル -->
+    <div id="confirm-clear-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 m-4 max-w-sm w-full">
+            <h3 class="text-lg font-bold mb-4">確認</h3>
+            <p class="text-gray-700 mb-6">本当にすべての画像をクリアしますか？</p>
+            <div class="flex justify-end gap-4">
+                <button id="cancel-clear-btn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">
+                    いいえ
+                </button>
+                <button id="confirm-clear-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded">
+                    はい、クリアします
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- DOM要素 ---
+        const dropZoneWrapper = document.getElementById('drop-zone-wrapper');
+        const dropZone = document.getElementById('drop-zone');
+        const imageListContainer = document.getElementById('image-list');
+        const placeholder = document.getElementById('placeholder');
+        const spinButton = document.getElementById('spin-button');
+        const clearButton = document.getElementById('clear-button'); // ★追加
+        const fileInput = document.getElementById('file-input');
+        const errorMessage = document.getElementById('error-message');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const rouletteModal = document.getElementById('roulette-modal');
+        const rouletteWindow = document.getElementById('roulette-window');
+        const rouletteImage = document.getElementById('roulette-image');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const confirmClearModal = document.getElementById('confirm-clear-modal'); // ★追加
+        const confirmClearBtn = document.getElementById('confirm-clear-btn'); // ★追加
+        const cancelClearBtn = document.getElementById('cancel-clear-btn'); // ★追加
+
+        // --- 状態管理 ---
+        let images = [];
+        let animationFrameId;
+
+        // --- イベントリスナー ---
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); });
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            handleFiles(e.dataTransfer.files);
+        });
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', e => handleFiles(e.target.files));
+        spinButton.addEventListener('click', startRoulette);
+        closeModalBtn.addEventListener('click', closeRoulette);
+        rouletteModal.addEventListener('click', e => { if (e.target === rouletteModal) closeRoulette(); });
+        
+        // ★追加: クリアボタン関連のイベント
+        clearButton.addEventListener('click', () => {
+            confirmClearModal.classList.remove('hidden');
+            confirmClearModal.classList.add('flex');
+        });
+        cancelClearBtn.addEventListener('click', () => {
+            confirmClearModal.classList.add('hidden');
+            confirmClearModal.classList.remove('flex');
+        });
+        confirmClearBtn.addEventListener('click', () => {
+            clearAllImages();
+            confirmClearModal.classList.add('hidden');
+            confirmClearModal.classList.remove('flex');
+        });
+
+
+        // --- 関数 ---
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        async function handleFiles(files) {
+            const imageFiles = [...files].filter(file => file.type.startsWith('image/'));
+            if (imageFiles.length === 0) return;
+
+            loadingOverlay.classList.remove('hidden');
+            loadingOverlay.classList.add('flex');
+
+            let loadedCount = 0;
+            for (const file of imageFiles) {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const img = new Image();
+                    img.onload = async () => {
+                         images.push({
+                            id: Date.now() + Math.random(),
+                            src: e.target.result,
+                            width: img.naturalWidth,
+                            height: img.naturalHeight
+                        });
+                        loadedCount++;
+                        if (loadedCount === imageFiles.length) {
+                            await saveImagesToDB();
+                            renderImages();
+                            loadingOverlay.classList.add('hidden');
+                            loadingOverlay.classList.remove('flex');
+                        }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function renderImages() {
+            imageListContainer.innerHTML = '';
+            errorMessage.classList.add('hidden');
+
+            if (images.length === 0) {
+                placeholder.classList.remove('hidden');
+                spinButton.disabled = true;
+                clearButton.disabled = true; // ★修正
+                imageListContainer.style.gridTemplateColumns = '';
+                return;
+            }
+            
+            placeholder.classList.add('hidden');
+            spinButton.disabled = false;
+            clearButton.disabled = false; // ★修正
+
+            const cols = Math.ceil(Math.sqrt(images.length));
+            const minTileSize = 50;
+            const containerWidth = dropZone.clientWidth;
+
+            if (containerWidth > 0 && containerWidth / cols < minTileSize) {
+                errorMessage.classList.remove('hidden');
+                spinButton.disabled = true;
+                clearButton.disabled = true; // ★修正
+                return;
+            }
+
+            imageListContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+
+            images.forEach(image => {
+                const tile = document.createElement('div');
+                tile.className = 'image-tile relative group aspect-square bg-transparent border-2 border-black rounded-xl overflow-hidden flex items-center justify-center p-1';
+                
+                const img = document.createElement('img');
+                img.src = image.src;
+                img.className = image.width > image.height ? 'w-full h-auto' : 'h-full w-auto';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>`;
+                deleteBtn.className = 'delete-btn absolute top-1 right-1 bg-black bg-opacity-60 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10';
+                
+                deleteBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    await removeImage(image.id);
+                };
+
+                tile.appendChild(img);
+                tile.appendChild(deleteBtn);
+                imageListContainer.appendChild(tile);
+            });
+        }
+        
+        async function removeImage(id) {
+            images = images.filter(image => image.id !== id);
+            await saveImagesToDB();
+            renderImages();
+        }
+
+        // ★追加: 全画像をクリアする関数
+        async function clearAllImages() {
+            images = [];
+            await saveImagesToDB();
+            renderImages();
+        }
+        
+        function startRoulette() {
+            if (images.length < 1) return;
+
+            spinButton.disabled = true;
+            clearButton.disabled = true; // ★修正
+            
+            const rect = dropZoneWrapper.getBoundingClientRect();
+            
+            rouletteModal.classList.remove('items-center', 'justify-center');
+            rouletteWindow.style.position = 'absolute';
+            rouletteWindow.style.top = `${rect.top}px`;
+            rouletteWindow.style.left = `${rect.left}px`;
+            rouletteWindow.style.width = `${rect.width}px`;
+            rouletteWindow.style.height = `${rect.height}px`;
+
+            rouletteModal.classList.remove('hidden');
+            rouletteModal.classList.add('flex');
+            
+            const DURATION = 4500; 
+            const MAX_SPEED_DELAY = 50;
+            const MIN_SPEED_DELAY = 400;
+            const WINNER = images[Math.floor(Math.random() * images.length)];
+
+            let startTime = null;
+            let lastImageChangeTime = 0;
+
+            function rouletteLoop(timestamp) {
+                if (!startTime) startTime = timestamp;
+                const elapsedTime = timestamp - startTime;
+
+                const progress = elapsedTime / DURATION;
+                const speedFactor = Math.sin(progress * Math.PI); 
+                
+                const delayRange = MIN_SPEED_DELAY - MAX_SPEED_DELAY;
+                const currentDelay = MIN_SPEED_DELAY - (delayRange * speedFactor);
+
+                if (timestamp - lastImageChangeTime > currentDelay) {
+                    let randomIndex;
+                    let nextImageSrc;
+                    do {
+                        randomIndex = Math.floor(Math.random() * images.length);
+                        nextImageSrc = images[randomIndex].src;
+                    } while (images.length > 1 && nextImageSrc === rouletteImage.src);
+                    
+                    rouletteImage.src = nextImageSrc;
+                    lastImageChangeTime = timestamp;
+                }
+
+                if (elapsedTime < DURATION) {
+                    animationFrameId = requestAnimationFrame(rouletteLoop);
+                } else {
+                    finalizeResult(WINNER);
+                }
+            }
+            animationFrameId = requestAnimationFrame(rouletteLoop);
+        }
+
+        function finalizeResult(winner) {
+            rouletteImage.src = winner.src;
+            rouletteImage.classList.add('winner-image');
+            rouletteWindow.classList.add('is-finished');
+        }
+
+        function closeRoulette() {
+            cancelAnimationFrame(animationFrameId);
+            rouletteModal.classList.add('hidden');
+            rouletteModal.classList.remove('flex');
+            rouletteImage.src = '';
+            rouletteImage.classList.remove('winner-image');
+            rouletteWindow.classList.remove('is-finished');
+            spinButton.disabled = images.length === 0;
+            clearButton.disabled = images.length === 0; // ★修正
+
+            rouletteModal.classList.add('items-center', 'justify-center');
+            rouletteWindow.style.cssText = '';
+        }
+        
+        async function saveImagesToDB() {
+            try {
+                await idbKeyval.set('rouletteImages', images);
+            } catch (e) {
+                console.error("Could not save images to IndexedDB:", e);
+                alert("画像を保存できませんでした。ブラウザのストレージに問題がある可能性があります。");
+            }
+        }
+
+        async function loadImagesFromDB() {
+            const savedImages = await idbKeyval.get('rouletteImages');
+            if (savedImages) {
+                images = savedImages;
+            }
+        }
+
+        async function initialize() {
+            await loadImagesFromDB();
+            renderImages();
+            const debouncedRender = debounce(renderImages, 250);
+            new ResizeObserver(debouncedRender).observe(dropZone);
+        }
+
+        initialize();
+    </script>
+</body>
+</html>
