@@ -7,6 +7,8 @@
     <link rel="icon" href="favicon10.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+    <!-- ★修正: Font AwesomeのCSSを追加 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
         /* カスタムスタイル */
         body {
@@ -73,7 +75,13 @@
     <!-- メインコンテンツ -->
     <main class="flex-1 flex flex-col p-4 md:p-8 overflow-hidden items-center justify-center">
         <header class="mb-4 text-center">
-            <h1 class="text-3xl font-bold text-gray-700">画像放り込みルーレット</h1>
+            <div class="flex justify-center items-center gap-3">
+                <h1 class="text-3xl font-bold text-gray-700">画像放り込みルーレット</h1>
+                <!-- ★修正: ボタンの構造をFont Awesomeアイコンに変更 -->
+                <button id="fullscreen-btn" title="全画面表示" class="text-gray-500 hover:text-gray-800 transition-colors p-2 rounded-lg border border-gray-400 hover:bg-gray-200 w-10 h-10 flex items-center justify-center">
+                    <i class="fas fa-expand text-xl"></i>
+                </button>
+            </div>
             <p class="text-gray-500 mt-1">画像をフィールド（点線内）にドロップして回転してください。</p>
         </header>
         
@@ -88,7 +96,7 @@
                     
                     <!-- 初期表示のメッセージ -->
                     <div id="placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-center text-gray-400 pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 002-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                         <p class="text-lg font-semibold">ここに画像をドラッグ＆ドロップ</p>
                     </div>
                      <!-- エラーメッセージ -->
@@ -103,12 +111,12 @@
                     <input type="file" id="file-input" class="hidden" multiple accept="image/*">
                 </div>
             </div>
-            <!-- ★修正点: 操作ボタンのコンテナ -->
+            <!-- 操作ボタンのコンテナ -->
             <div class="flex flex-col items-center gap-4">
-                <button id="clear-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-full shadow-md transform hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100">
+                <button id="clear-button" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transform hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100 border-2 border-red-700 hover:border-red-800">
                     全クリア
                 </button>
-                <button id="spin-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-full shadow-lg transform hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100">
+                <button id="spin-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:scale-100 border-2 border-blue-700 hover:border-blue-800">
                     回転
                 </button>
             </div>
@@ -127,7 +135,7 @@
         </div>
     </div>
 
-    <!-- ★追加点: クリア確認モーダル -->
+    <!-- クリア確認モーダル -->
     <div id="confirm-clear-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50">
         <div class="bg-white rounded-lg shadow-xl p-6 m-4 max-w-sm w-full">
             <h3 class="text-lg font-bold mb-4">確認</h3>
@@ -151,7 +159,7 @@
         const imageListContainer = document.getElementById('image-list');
         const placeholder = document.getElementById('placeholder');
         const spinButton = document.getElementById('spin-button');
-        const clearButton = document.getElementById('clear-button'); // ★追加
+        const clearButton = document.getElementById('clear-button');
         const fileInput = document.getElementById('file-input');
         const errorMessage = document.getElementById('error-message');
         const loadingOverlay = document.getElementById('loading-overlay');
@@ -159,10 +167,11 @@
         const rouletteWindow = document.getElementById('roulette-window');
         const rouletteImage = document.getElementById('roulette-image');
         const closeModalBtn = document.getElementById('close-modal-btn');
-        const confirmClearModal = document.getElementById('confirm-clear-modal'); // ★追加
-        const confirmClearBtn = document.getElementById('confirm-clear-btn'); // ★追加
-        const cancelClearBtn = document.getElementById('cancel-clear-btn'); // ★追加
-
+        const confirmClearModal = document.getElementById('confirm-clear-modal');
+        const confirmClearBtn = document.getElementById('confirm-clear-btn');
+        const cancelClearBtn = document.getElementById('cancel-clear-btn');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        
         // --- 状態管理 ---
         let images = [];
         let animationFrameId;
@@ -181,7 +190,6 @@
         closeModalBtn.addEventListener('click', closeRoulette);
         rouletteModal.addEventListener('click', e => { if (e.target === rouletteModal) closeRoulette(); });
         
-        // ★追加: クリアボタン関連のイベント
         clearButton.addEventListener('click', () => {
             confirmClearModal.classList.remove('hidden');
             confirmClearModal.classList.add('flex');
@@ -195,6 +203,9 @@
             confirmClearModal.classList.add('hidden');
             confirmClearModal.classList.remove('flex');
         });
+        
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        document.addEventListener('fullscreenchange', updateFullscreenButton);
 
 
         // --- 関数 ---
@@ -251,14 +262,14 @@
             if (images.length === 0) {
                 placeholder.classList.remove('hidden');
                 spinButton.disabled = true;
-                clearButton.disabled = true; // ★修正
+                clearButton.disabled = true;
                 imageListContainer.style.gridTemplateColumns = '';
                 return;
             }
             
             placeholder.classList.add('hidden');
             spinButton.disabled = false;
-            clearButton.disabled = false; // ★修正
+            clearButton.disabled = false;
 
             const cols = Math.ceil(Math.sqrt(images.length));
             const minTileSize = 50;
@@ -267,7 +278,7 @@
             if (containerWidth > 0 && containerWidth / cols < minTileSize) {
                 errorMessage.classList.remove('hidden');
                 spinButton.disabled = true;
-                clearButton.disabled = true; // ★修正
+                clearButton.disabled = true;
                 return;
             }
 
@@ -302,7 +313,6 @@
             renderImages();
         }
 
-        // ★追加: 全画像をクリアする関数
         async function clearAllImages() {
             images = [];
             await saveImagesToDB();
@@ -313,7 +323,7 @@
             if (images.length < 1) return;
 
             spinButton.disabled = true;
-            clearButton.disabled = true; // ★修正
+            clearButton.disabled = true;
             
             const rect = dropZoneWrapper.getBoundingClientRect();
             
@@ -380,7 +390,7 @@
             rouletteImage.classList.remove('winner-image');
             rouletteWindow.classList.remove('is-finished');
             spinButton.disabled = images.length === 0;
-            clearButton.disabled = images.length === 0; // ★修正
+            clearButton.disabled = images.length === 0;
 
             rouletteModal.classList.add('items-center', 'justify-center');
             rouletteWindow.style.cssText = '';
@@ -401,10 +411,38 @@
                 images = savedImages;
             }
         }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // ★修正: JavaScriptのロジックをアイコンクラスの切り替えに変更
+        function updateFullscreenButton() {
+            const icon = fullscreenBtn.querySelector('i');
+            if (document.fullscreenElement) {
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+                fullscreenBtn.title = "全画面表示を解除";
+            } else {
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+                fullscreenBtn.title = "全画面表示";
+            }
+        }
 
         async function initialize() {
             await loadImagesFromDB();
             renderImages();
+            // ★修正: 初期読み込み時にもボタンの状態を更新
+            updateFullscreenButton();
             const debouncedRender = debounce(renderImages, 250);
             new ResizeObserver(debouncedRender).observe(dropZone);
         }
@@ -413,3 +451,4 @@
     </script>
 </body>
 </html>
+
